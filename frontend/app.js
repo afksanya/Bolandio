@@ -274,8 +274,8 @@ const playerFavicon = document.getElementById("player-favicon");
 const playerFaviconPlaceholder = document.getElementById("player-favicon-placeholder");
 const btnPlayPause = document.getElementById("btn-play-pause");
 const btnFavPlayer = document.getElementById("btn-fav-player");
-const sleepSelect = document.getElementById("sleep-select");
-const sleepCountdown = document.getElementById("sleep-countdown");
+const sleepSelect = document.getElementById("exp-sleep-select");
+const sleepCountdown = document.getElementById("exp-sleep-countdown");
 const stationList = document.getElementById("station-list");
 const favoritesList = document.getElementById("favorites-list");
 const loadMoreWrap = document.getElementById("load-more-wrap");
@@ -830,9 +830,6 @@ function openExpanded() {
   playerExpanded.classList.remove("hidden");
   playerExpanded.classList.toggle("is-playing", isPlaying);
 
-  // sync sleep
-  expSleepSelect.value = sleepSelect.value;
-  expSleepCountdown.textContent = sleepCountdown.textContent;
 }
 
 function closeExpanded() {
@@ -863,17 +860,6 @@ expFav.addEventListener("click", () => {
   expFav.textContent = isFav ? "♥" : "♡";
 });
 
-expSleepSelect.addEventListener("change", () => {
-  sleepSelect.value = expSleepSelect.value;
-  sleepSelect.dispatchEvent(new Event("change"));
-});
-
-// Keep exp sleep countdown in sync
-setInterval(() => {
-  if (!playerExpanded.classList.contains("hidden")) {
-    expSleepCountdown.textContent = sleepCountdown.textContent;
-  }
-}, 1000);
 
 // Sync expanded play button when audio state changes
 audio.addEventListener("playing", () => {

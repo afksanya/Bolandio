@@ -15,71 +15,72 @@
 <body>
   <div id="app">
 
-    <!-- Header -->
-    <header>
-      <div class="header-left">
+    <!-- Sidebar (desktop) / Top nav (mobile) -->
+    <aside class="app-sidebar">
+      <div class="sidebar-top">
         <h1 id="app-title">🌍 全球电台</h1>
-      </div>
-      <div class="header-actions">
-        <button class="icon-btn lang-btn" id="btn-lang" title="Language">EN</button>
-        <button class="icon-btn" id="btn-theme" title="切换主题">🌙</button>
-      </div>
-    </header>
-
-    <!-- Tab Nav -->
-    <nav class="tabs">
-      <button class="tab active" data-tab="discover" id="tab-btn-discover">发现</button>
-      <button class="tab" data-tab="favorites" id="tab-btn-favorites">收藏</button>
-      <button class="tab" data-tab="history" id="tab-btn-history">历史</button>
-    </nav>
-
-    <!-- Discover Tab -->
-    <div id="tab-discover" class="tab-content active">
-      <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-icon">🔍</span>
-          <input id="search-input" type="text" placeholder="搜索电台名称..." />
+        <div class="header-actions">
+          <button class="icon-btn lang-btn" id="btn-lang" title="Language">EN</button>
+          <button class="icon-btn" id="btn-theme" title="切换主题">🌙</button>
         </div>
-        <div class="select-wrap">
-          <select id="filter-country">
-            <option value="">全部国家</option>
-          </select>
-        </div>
-        <div class="select-wrap">
-          <select id="filter-tag">
-            <option value="">全部风格</option>
-          </select>
-        </div>
-        <button id="btn-search">搜索</button>
       </div>
-      <div id="station-list" class="station-list">
-        <div class="loading">加载中...</div>
-      </div>
-      <div id="load-more-wrap" class="load-more-wrap" style="display:none">
-        <button id="btn-load-more">加载更多</button>
-      </div>
-    </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="discover" id="tab-btn-discover">发现</button>
+        <button class="tab" data-tab="favorites" id="tab-btn-favorites">收藏</button>
+        <button class="tab" data-tab="history" id="tab-btn-history">历史</button>
+      </nav>
+    </aside>
 
-    <!-- History Tab -->
-    <div id="tab-history" class="tab-content">
-      <div class="history-header">
-        <span id="history-count"></span>
-        <button id="btn-clear-history"></button>
-      </div>
-      <div id="history-list" class="station-list">
-      </div>
-    </div>
+    <!-- Main content -->
+    <main class="app-main">
 
-    <!-- Favorites Tab -->
-    <div id="tab-favorites" class="tab-content">
-      <div class="group-bar" id="group-bar">
-        <!-- group chips injected by JS -->
-        <button class="btn-add-group" id="btn-add-group" title="新建分组">+</button>
+      <!-- Discover Tab -->
+      <div id="tab-discover" class="tab-content active">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input id="search-input" type="text" placeholder="搜索电台名称..." />
+          </div>
+          <div class="select-wrap">
+            <select id="filter-country">
+              <option value="">全部国家</option>
+            </select>
+          </div>
+          <div class="select-wrap">
+            <select id="filter-tag">
+              <option value="">全部风格</option>
+            </select>
+          </div>
+          <button id="btn-search">搜索</button>
+        </div>
+        <div id="station-list" class="station-list">
+          <div class="loading">加载中...</div>
+        </div>
+        <div id="load-more-wrap" class="load-more-wrap" style="display:none">
+          <button id="btn-load-more">加载更多</button>
+        </div>
       </div>
-      <div id="favorites-list" class="station-list">
-        <div class="empty">还没有收藏，去发现页收藏喜欢的电台吧 ✨</div>
+
+      <!-- Favorites Tab -->
+      <div id="tab-favorites" class="tab-content">
+        <div class="group-bar" id="group-bar">
+          <button class="btn-add-group" id="btn-add-group" title="新建分组">+</button>
+        </div>
+        <div id="favorites-list" class="station-list">
+          <div class="empty">还没有收藏，去发现页收藏喜欢的电台吧 ✨</div>
+        </div>
       </div>
-    </div>
+
+      <!-- History Tab -->
+      <div id="tab-history" class="tab-content">
+        <div class="history-header">
+          <span id="history-count"></span>
+          <button id="btn-clear-history"></button>
+        </div>
+        <div id="history-list" class="station-list"></div>
+      </div>
+
+    </main>
 
     <!-- Player -->
     <div id="player" class="player hidden">
@@ -121,7 +122,7 @@
     </div>
   </div>
 
-  <!-- New group modal (from favorites tab) -->
+  <!-- New group modal -->
   <div class="modal-overlay" id="modal-new-group">
     <div class="modal-sheet">
       <div class="modal-title">新建分组</div>

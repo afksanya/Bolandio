@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="全球电台" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>全球电台</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <h1>🌍 全球电台</h1>
+    </header>
+
+    <!-- Tab Nav -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="discover">发现</button>
+      <button class="tab" data-tab="favorites">收藏</button>
+    </nav>
+
+    <!-- Discover Tab -->
+    <div id="tab-discover" class="tab-content active">
+      <div class="search-bar">
+        <input id="search-input" type="text" placeholder="搜索电台名称..." />
+        <select id="filter-country">
+          <option value="">全部国家</option>
+        </select>
+        <select id="filter-tag">
+          <option value="">全部风格</option>
+        </select>
+        <button id="btn-search">搜索</button>
+      </div>
+      <div id="station-list" class="station-list">
+        <div class="loading">加载中...</div>
+      </div>
+      <div id="load-more-wrap" class="load-more-wrap" style="display:none">
+        <button id="btn-load-more">加载更多</button>
+      </div>
+    </div>
+
+    <!-- Favorites Tab -->
+    <div id="tab-favorites" class="tab-content">
+      <div id="favorites-list" class="station-list">
+        <div class="empty">还没有收藏，去发现页收藏喜欢的电台吧</div>
+      </div>
+    </div>
+
+    <!-- Player -->
+    <div id="player" class="player hidden">
+      <div class="player-info">
+        <img id="player-favicon" src="" alt="" onerror="this.style.display='none'" />
+        <div class="player-text">
+          <div id="player-name" class="player-name"></div>
+          <div id="player-meta" class="player-meta"></div>
+        </div>
+      </div>
+      <div class="player-controls">
+        <button id="btn-play-pause" class="btn-play">⏸</button>
+        <div class="sleep-wrap">
+          <select id="sleep-select">
+            <option value="0">定时关闭</option>
+            <option value="15">15分钟</option>
+            <option value="30">30分钟</option>
+            <option value="60">60分钟</option>
+            <option value="90">90分钟</option>
+          </select>
+          <span id="sleep-countdown" class="sleep-countdown"></span>
+        </div>
+        <button id="btn-fav-player" class="btn-fav" title="收藏">♡</button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audio-player" preload="none"></audio>
+
+  <script src="/app.js"></script>
+</body>
+</html>

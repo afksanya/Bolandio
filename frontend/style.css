@@ -454,6 +454,35 @@ header h1 {
 }
 .btn-add-group:active { opacity: 0.7; }
 
+/* ── History Header ──────────────────────────────────────────── */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 4px;
+  color: var(--text2);
+  font-size: 13px;
+}
+
+#btn-clear-history {
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background var(--transition), color var(--transition);
+}
+#btn-clear-history:hover { background: var(--input-bg); color: var(--accent2); }
+
+.history-time {
+  font-size: 11px;
+  color: var(--text2);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
 /* ── Modal (group picker / new group) ────────────────────────── */
 .modal-overlay {
   position: fixed;

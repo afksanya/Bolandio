@@ -1,4 +1,91 @@
 // ── i18n ──────────────────────────────────────────────────────
+// ── History ───────────────────────────────────────────────────
+const HISTORY_KEY = "radio_history";
+const HISTORY_MAX = 30;
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveToHistory(station) {
+  let history = loadHistory();
+  // Remove duplicate
+  history = history.filter(s => s.stationuuid !== station.stationuuid);
+  // Add to front with timestamp
+  history.unshift({ ...station, playedAt: Date.now() });
+  // Keep max 30
+  history = history.slice(0, HISTORY_MAX);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+}
+
+function formatTimeAgo(ts) {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return lang === "zh" ? "刚刚" : "just now";
+  if (diff < 3600) return lang === "zh" ? `${Math.floor(diff/60)}分钟前` : `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return lang === "zh" ? `${Math.floor(diff/3600)}小时前` : `${Math.floor(diff/3600)}h ago`;
+  return lang === "zh" ? `${Math.floor(diff/86400)}天前` : `${Math.floor(diff/86400)}d ago`;
+}
+
+function renderHistory() {
+  const historyList = document.getElementById("history-list");
+  const historyCount = document.getElementById("history-count");
+  const history = loadHistory();
+
+  historyCount.textContent = lang === "zh" ? `共 ${history.length} 条` : `${history.length} stations`;
+  document.getElementById("btn-clear-history").textContent = lang === "zh" ? "清空" : "Clear";
+
+  historyList.innerHTML = "";
+  if (history.length === 0) {
+    historyList.innerHTML = `<div class="empty">${lang === "zh" ? "还没有播放记录" : "No history yet"}</div>`;
+    return;
+  }
+  history.forEach(station => {
+    const card = document.createElement("div");
+    const isNowPlaying = currentStation?.stationuuid === station.stationuuid;
+    card.className = "station-card" + (isNowPlaying ? " playing" : "");
+    card.dataset.uuid = station.stationuuid;
+    const isFav = favorites.has(station.stationuuid);
+    const tags = station.tags ? station.tags.split(",").slice(0, 2).join(", ") : "";
+    const meta = [station.country, tags].filter(Boolean).join(" · ");
+    card.innerHTML = `
+      <div class="station-favicon-wrap">
+        ${station.favicon
+          ? `<img class="station-favicon" src="${escHtml(station.favicon)}" alt=""
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          : ""}
+        <div class="station-favicon-placeholder" ${station.favicon ? 'style="display:none"' : ""}>📻</div>
+        <div class="equalizer"><span></span><span></span><span></span></div>
+      </div>
+      <div class="station-info">
+        <div class="station-name">${escHtml(station.name)}</div>
+        <div class="station-meta">${escHtml(meta)}</div>
+      </div>
+      <div class="station-actions">
+        <span class="history-time">${formatTimeAgo(station.playedAt)}</span>
+        <button class="btn-fav ${isFav ? "active" : ""}">${isFav ? "♥" : "♡"}</button>
+      </div>
+    `;
+    card.querySelector(".btn-fav").addEventListener("click", e => {
+      e.stopPropagation();
+      if (favorites.has(station.stationuuid)) {
+        removeFavorite(station.stationuuid);
+        syncFavBtn(station.stationuuid, false);
+      } else {
+        openGroupPicker(station);
+      }
+    });
+    card.addEventListener("click", () => playStation(station));
+    historyList.appendChild(card);
+  });
+}
+
+// ── i18n ──────────────────────────────────────────────────────
 const STRINGS = {
   zh: {
     title: "🌍 全球电台",
@@ -53,6 +140,7 @@ function applyLang() {
   document.getElementById("app-title").textContent = t("title");
   document.getElementById("tab-btn-discover").textContent = t("discover");
   document.getElementById("tab-btn-favorites").textContent = t("favorites");
+  document.getElementById("tab-btn-history").textContent = lang === "zh" ? "历史" : "History";
   document.getElementById("search-input").placeholder = t("searchPlaceholder");
   document.getElementById("filter-country").options[0].textContent = t("allCountries");
   document.getElementById("filter-tag").options[0].textContent = t("allGenres");
@@ -66,6 +154,8 @@ function applyLang() {
     sleepSel.options[i].textContent = lang === "zh" ? `${mins}${t("min")}` : `${mins} min`;
   }
 }
+
+document.getElementById("btn-clear-history").addEventListener("click", clearHistory);
 
 document.getElementById("btn-lang").addEventListener("click", () => {
   lang = lang === "zh" ? "en" : "zh";
@@ -134,6 +224,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     tab.classList.add("active");
     document.getElementById(`tab-${tab.dataset.tab}`).classList.add("active");
     if (tab.dataset.tab === "favorites") renderFavorites();
+    if (tab.dataset.tab === "history") renderHistory();
   });
 });
 
@@ -231,6 +322,7 @@ function playStation(station) {
   document.querySelector(`.station-card[data-uuid="${station.stationuuid}"]`)?.classList.add("playing");
 
   currentStation = station;
+  saveToHistory(station);
   audio.src = station.url_resolved || station.url;
   audio.load();
   audio.play().catch(() => {});

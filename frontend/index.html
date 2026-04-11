@@ -30,6 +30,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="discover" id="tab-btn-discover">发现</button>
       <button class="tab" data-tab="favorites" id="tab-btn-favorites">收藏</button>
+      <button class="tab" data-tab="history" id="tab-btn-history">历史</button>
     </nav>
 
     <!-- Discover Tab -->
@@ -56,6 +57,16 @@
       </div>
       <div id="load-more-wrap" class="load-more-wrap" style="display:none">
         <button id="btn-load-more">加载更多</button>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="tab-history" class="tab-content">
+      <div class="history-header">
+        <span id="history-count"></span>
+        <button id="btn-clear-history"></button>
+      </div>
+      <div id="history-list" class="station-list">
       </div>
     </div>
 

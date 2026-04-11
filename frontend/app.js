@@ -609,9 +609,11 @@ document.getElementById("modal-new-group-btn").addEventListener("click", () => {
   addFavorite(pendingFavStation, name);
 });
 
-// Close modal on overlay click
+// Close modal on overlay click or X button
 modalGroupPicker.addEventListener("click", e => { if (e.target === modalGroupPicker) closeModal(modalGroupPicker); });
 modalNewGroup.addEventListener("click", e => { if (e.target === modalNewGroup) closeModal(modalNewGroup); });
+document.getElementById("modal-group-close").addEventListener("click", () => closeModal(modalGroupPicker));
+document.getElementById("modal-new-group-close").addEventListener("click", () => closeModal(modalNewGroup));
 
 // New group from favorites tab
 document.getElementById("btn-add-group").addEventListener("click", () => {

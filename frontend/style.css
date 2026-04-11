@@ -1132,3 +1132,41 @@ h1#app-title {
     border-radius: 0;
   }
 }
+
+/* ── Modal close button ──────────────────────────────────────── */
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: var(--input-bg);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+}
+.modal-close:hover { background: var(--card-hover); color: var(--text); }
+.modal-sheet { position: relative; }
+
+/* ── Desktop player refinements ──────────────────────────────── */
+@media (min-width: 768px) {
+  #btn-random-mini { display: none; }
+
+  .player {
+    left: var(--sidebar-w);
+    padding-left: 28px;
+    padding-right: 28px;
+    gap: 20px;
+  }
+
+  .player-info { gap: 14px; }
+
+  .player-name { font-size: 15px; }
+  .player-meta { font-size: 12px; }
+}

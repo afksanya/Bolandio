@@ -2,7 +2,7 @@
 
 一个可以添加到 iPhone 主屏幕的全球电台 PWA，收录全球 30,000+ 免费电台。
 
-**在线地址：** https://radio-app-production-faa3.up.railway.app
+**在线地址：** https://bolandio.up.railway.app
 
 ## 功能
 
@@ -44,7 +44,7 @@ cd Bolandio
 
 A PWA for streaming 30,000+ free radio stations worldwide. Works on iPhone, desktop, and any browser.
 
-**Live:** https://radio-app-production-faa3.up.railway.app
+**Live:** https://bolandio.up.railway.app
 
 ## Features
 

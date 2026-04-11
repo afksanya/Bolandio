@@ -209,11 +209,13 @@ function applyLang() {
   document.getElementById("btn-search").textContent = t("search");
   document.getElementById("btn-load-more").textContent = t("loadMore");
   document.getElementById("btn-lang").textContent = lang === "zh" ? "EN" : "中";
-  const sleepSel = document.getElementById("sleep-select");
-  sleepSel.options[0].textContent = t("timer");
-  for (let i = 1; i < sleepSel.options.length; i++) {
-    const mins = sleepSel.options[i].value;
-    sleepSel.options[i].textContent = lang === "zh" ? `${mins}${t("min")}` : `${mins} min`;
+  const sleepSel = document.getElementById("exp-sleep-select");
+  if (sleepSel) {
+    sleepSel.options[0].textContent = t("timer");
+    for (let i = 1; i < sleepSel.options.length; i++) {
+      const mins = sleepSel.options[i].value;
+      sleepSel.options[i].textContent = lang === "zh" ? `${mins}${t("min")}` : `${mins} min`;
+    }
   }
 }
 

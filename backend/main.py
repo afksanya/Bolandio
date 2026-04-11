@@ -8,7 +8,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pathlib import Path
 
-# Railway 挂载 Volume 时设置 DATA_DIR 环境变量，否则存在 backend/ 目录下
 _data_dir = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
 DB_PATH = _data_dir / "favorites.db"
 FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
@@ -25,9 +24,15 @@ def init_db():
             country TEXT,
             tags TEXT,
             favicon TEXT,
+            group_name TEXT DEFAULT '默认',
             added_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # migrate existing tables
+    try:
+        conn.execute("ALTER TABLE favorites ADD COLUMN group_name TEXT DEFAULT '默认'")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -48,6 +53,7 @@ class FavoriteStation(BaseModel):
     country: str = ""
     tags: str = ""
     favicon: str = ""
+    group_name: str = "默认"
 
 
 @app.get("/api/stations/search")
@@ -105,9 +111,17 @@ async def get_tags():
 def get_favorites():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM favorites ORDER BY added_at DESC").fetchall()
+    rows = conn.execute("SELECT * FROM favorites ORDER BY group_name, added_at DESC").fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+@app.get("/api/favorites/groups")
+def get_groups():
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute("SELECT DISTINCT group_name FROM favorites ORDER BY group_name").fetchall()
+    conn.close()
+    return [r[0] for r in rows]
 
 
 @app.post("/api/favorites")
@@ -115,12 +129,22 @@ def add_favorite(station: FavoriteStation):
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.execute(
-            "INSERT OR REPLACE INTO favorites (stationuuid, name, url, country, tags, favicon) VALUES (?,?,?,?,?,?)",
-            (station.stationuuid, station.name, station.url, station.country, station.tags, station.favicon),
+            "INSERT OR REPLACE INTO favorites (stationuuid, name, url, country, tags, favicon, group_name) VALUES (?,?,?,?,?,?,?)",
+            (station.stationuuid, station.name, station.url, station.country, station.tags, station.favicon, station.group_name),
         )
         conn.commit()
     finally:
         conn.close()
+    return {"ok": True}
+
+
+@app.patch("/api/favorites/{stationuuid}/group")
+def move_to_group(stationuuid: str, body: dict):
+    group_name = body.get("group_name", "默认")
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE favorites SET group_name=? WHERE stationuuid=?", (group_name, stationuuid))
+    conn.commit()
+    conn.close()
     return {"ok": True}
 
 
@@ -133,7 +157,6 @@ def remove_favorite(stationuuid: str):
     return {"ok": True}
 
 
-# Serve frontend
 app.mount("/static", StaticFiles(directory=FRONTEND_PATH), name="static")
 
 

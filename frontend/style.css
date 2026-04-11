@@ -495,15 +495,11 @@ h1#app-title {
   top: 0; left: 0;
   height: 2px; width: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent2));
-  animation: progress-stream 3s linear infinite;
   opacity: 0;
+  transition: opacity 0.3s;
 }
 .player.playing::before { opacity: 1; }
 
-@keyframes progress-stream {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
 
 .player-info {
   display: flex;
@@ -614,6 +610,7 @@ h1#app-title {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   opacity: 0;
+  transition: opacity 0.3s;
   pointer-events: none;
   transition: opacity 0.2s;
 }
@@ -1098,6 +1095,7 @@ h1#app-title {
   border-radius: 20px;
   box-shadow: var(--shadow);
   opacity: 0;
+  transition: opacity 0.3s;
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
   white-space: nowrap;

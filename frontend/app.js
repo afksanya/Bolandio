@@ -88,7 +88,7 @@ function renderHistory() {
 // ── i18n ──────────────────────────────────────────────────────
 const STRINGS = {
   zh: {
-    title: "🌍 全球电台",
+    title: "🌍 Bolandio",
     discover: "发现",
     favorites: "收藏",
     searchPlaceholder: "搜索电台名称...",
@@ -110,7 +110,7 @@ const STRINGS = {
     moveToGroup: "移动到分组",
   },
   en: {
-    title: "🌍 Global Radio",
+    title: "🌍 Bolandio",
     discover: "Discover",
     favorites: "Favorites",
     searchPlaceholder: "Search stations...",

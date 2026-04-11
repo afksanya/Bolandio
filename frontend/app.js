@@ -901,7 +901,9 @@ async function checkShareLink() {
 // ── Init ───────────────────────────────────────────────────────
 (async () => {
   applyLang();
-  await Promise.all([loadFavorites(), loadFilters()]);
+  // 收藏必须等，电台列表依赖它；过滤器在后台加载，不阻塞电台显示
+  await loadFavorites();
+  loadFilters(); // 后台加载，不 await
   lastQuery = {};
   await loadStations(true);
   await checkShareLink();

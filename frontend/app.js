@@ -101,11 +101,13 @@ function renderHistory() {
   document.getElementById("btn-clear-history").textContent = lang === "zh" ? "清空" : "Clear";
 
   historyList.innerHTML = "";
+  currentPlaylist = [];
   if (history.length === 0) {
     historyList.innerHTML = `<div class="empty">${lang === "zh" ? "还没有播放记录" : "No history yet"}</div>`;
     return;
   }
   history.forEach(station => {
+    currentPlaylist.push(station);
     const card = document.createElement("div");
     const isNowPlaying = currentStation?.stationuuid === station.stationuuid;
     card.className = "station-card" + (isNowPlaying ? " playing" : "");
@@ -259,7 +261,9 @@ let sleepTick = null;
 let currentOffset = 0;
 let lastQuery = {};
 let activeGroup = "__all__";
-let pendingFavStation = null;   // station waiting for group selection
+let pendingFavStation = null;
+let currentPlaylist = [];       // stations visible in current list
+let currentPlaylistIndex = -1;
 
 // ── DOM ───────────────────────────────────────────────────────
 const audio = document.getElementById("audio-player");
@@ -334,12 +338,13 @@ async function loadStations(reset) {
   if (reset) {
     showSkeleton(stationList);
     loadMoreWrap.style.display = "none";
+    currentPlaylist = [];
   }
   const params = new URLSearchParams({ limit: 30, offset: currentOffset, ...lastQuery });
   const data = await apiFetch(`/api/stations/search?${params}`);
   if (!data) return;
   if (reset) stationList.innerHTML = "";
-  data.forEach(s => renderStationCard(s, stationList));
+  data.forEach(s => { currentPlaylist.push(s); renderStationCard(s, stationList); });
   loadMoreWrap.style.display = data.length === 30 ? "block" : "none";
 }
 
@@ -408,6 +413,7 @@ function playStation(station) {
   document.querySelector(`.station-card[data-uuid="${station.stationuuid}"]`)?.classList.add("playing");
 
   currentStation = station;
+  currentPlaylistIndex = currentPlaylist.findIndex(s => s.stationuuid === station.stationuuid);
   saveToHistory(station);
   audio.src = station.url_resolved || station.url;
   audio.load();
@@ -472,6 +478,21 @@ audio.addEventListener("error", () => {
 });
 
 // ── Media Session ─────────────────────────────────────────────
+function playNext() {
+  if (!currentPlaylist.length) return;
+  const idx = (currentPlaylistIndex + 1) % currentPlaylist.length;
+  playStation(currentPlaylist[idx]);
+}
+
+function playPrev() {
+  if (!currentPlaylist.length) return;
+  const idx = (currentPlaylistIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
+  playStation(currentPlaylist[idx]);
+}
+
+document.getElementById("exp-next").addEventListener("click", playNext);
+document.getElementById("exp-prev").addEventListener("click", playPrev);
+
 function setupMediaSession(station) {
   if (!("mediaSession" in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
@@ -485,6 +506,8 @@ function setupMediaSession(station) {
   navigator.mediaSession.setActionHandler("pause", () => {
     audio.pause(); isPlaying = false; btnPlayPause.textContent = "▶"; player.classList.remove("playing");
   });
+  navigator.mediaSession.setActionHandler("nexttrack", playNext);
+  navigator.mediaSession.setActionHandler("previoustrack", playPrev);
 }
 
 // ── Sleep Timer ───────────────────────────────────────────────
@@ -640,6 +663,7 @@ function renderGroupBar() {
 function renderFavorites() {
   renderGroupBar();
   favoritesList.innerHTML = "";
+  currentPlaylist = [];
 
   let items = [...favorites.values()];
   if (activeGroup !== "__all__") {
@@ -664,10 +688,10 @@ function renderFavorites() {
       header.className = "section-header";
       header.textContent = g;
       favoritesList.appendChild(header);
-      stations.forEach(s => renderStationCard(s, favoritesList));
+      stations.forEach(s => { currentPlaylist.push(s); renderStationCard(s, favoritesList); });
     });
   } else {
-    items.forEach(s => renderStationCard(s, favoritesList));
+    items.forEach(s => { currentPlaylist.push(s); renderStationCard(s, favoritesList); });
   }
 }
 

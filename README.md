@@ -1,4 +1,4 @@
-# 全球电台 🌍
+# Bolandio 🌍
 
 一个可以添加到 iPhone 主屏幕的全球电台 PWA，收录全球 30,000+ 免费电台。
 
@@ -25,8 +25,8 @@
 ## 本地运行
 
 ```bash
-git clone https://github.com/afksanya/radio-app.git
-cd radio-app
+git clone https://github.com/afksanya/Bolandio.git
+cd Bolandio
 ./run.sh
 ```
 
@@ -67,8 +67,8 @@ A PWA for streaming 30,000+ free radio stations worldwide. Works on iPhone, desk
 ## Run Locally
 
 ```bash
-git clone https://github.com/afksanya/radio-app.git
-cd radio-app
+git clone https://github.com/afksanya/Bolandio.git
+cd Bolandio
 ./run.sh
 ```
 

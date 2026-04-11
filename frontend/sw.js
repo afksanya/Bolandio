@@ -1,4 +1,4 @@
-const CACHE = "radio-app-v6";
+const CACHE = "radio-app-v7";
 const ASSETS = ["/", "/index.html", "/style.css", "/app.js", "/manifest.json"];
 
 self.addEventListener("install", e => {

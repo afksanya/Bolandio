@@ -98,6 +98,28 @@ async def get_countries():
         ]
 
 
+@app.get("/api/stations/random")
+async def get_random_station():
+    import random
+    offset = random.randint(0, 400)
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(f"{RADIO_API}/stations/topvote", params={
+            "limit": 1, "offset": offset, "hidebroken": "true"
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        return data[0] if data else {}
+
+
+@app.get("/api/stations/uuid/{uuid}")
+async def get_station_by_uuid(uuid: str):
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(f"{RADIO_API}/stations/byuuid/{uuid}")
+        resp.raise_for_status()
+        data = resp.json()
+        return data[0] if data else {}
+
+
 @app.get("/api/stations/tags")
 async def get_tags():
     async with httpx.AsyncClient(timeout=10) as client:

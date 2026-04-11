@@ -278,6 +278,12 @@ const loadMoreWrap = document.getElementById("load-more-wrap");
 const groupBar = document.getElementById("group-bar");
 const modalGroupPicker = document.getElementById("modal-group-picker");
 const modalNewGroup = document.getElementById("modal-new-group");
+const playerExpanded = document.getElementById("player-expanded");
+const expPlayPause = document.getElementById("exp-play-pause");
+const expFav = document.getElementById("exp-fav");
+const expSleepSelect = document.getElementById("exp-sleep-select");
+const expSleepCountdown = document.getElementById("exp-sleep-countdown");
+const toast = document.getElementById("toast");
 
 // ── Tabs ──────────────────────────────────────────────────────
 document.querySelectorAll(".tab").forEach(tab => {
@@ -312,9 +318,21 @@ document.getElementById("btn-load-more").addEventListener("click", () => {
   loadStations(false);
 });
 
+function showSkeleton(container, count = 6) {
+  container.innerHTML = Array.from({ length: count }, () => `
+    <div class="skeleton-card">
+      <div class="skeleton-art"></div>
+      <div class="skeleton-lines">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+    </div>
+  `).join("");
+}
+
 async function loadStations(reset) {
   if (reset) {
-    stationList.innerHTML = `<div class="loading">${t("loading")}</div>`;
+    showSkeleton(stationList);
     loadMoreWrap.style.display = "none";
   }
   const params = new URLSearchParams({ limit: 30, offset: currentOffset, ...lastQuery });
@@ -415,6 +433,9 @@ function playStation(station) {
   player.classList.add("playing");
   isPlaying = true;
   btnPlayPause.textContent = "⏸";
+
+  // Sync expanded player if open
+  if (!playerExpanded.classList.contains("hidden")) openExpanded();
 
   setupMediaSession(station);
 }
@@ -715,11 +736,148 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// ── Random Play ───────────────────────────────────────────────
+async function playRandom() {
+  showToast(lang === "zh" ? "🎲 随机选台中..." : "🎲 Finding random station...");
+  const station = await apiFetch("/api/stations/random");
+  if (station?.stationuuid) playStation(station);
+}
+
+document.getElementById("btn-random").addEventListener("click", playRandom);
+document.getElementById("btn-random-mini").addEventListener("click", playRandom);
+document.getElementById("exp-random").addEventListener("click", playRandom);
+
+// ── Toast ─────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, duration = 2200) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), duration);
+}
+
+// ── Share ─────────────────────────────────────────────────────
+document.getElementById("exp-share").addEventListener("click", async () => {
+  if (!currentStation) return;
+  const url = `${location.origin}/?play=${currentStation.stationuuid}`;
+  const title = currentStation.name;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text: `${lang === "zh" ? "正在收听" : "Listening to"} ${title}`, url });
+      return;
+    } catch {}
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast(lang === "zh" ? "✅ 链接已复制" : "✅ Link copied");
+  } catch {
+    showToast(url, 4000);
+  }
+});
+
+// ── Expanded Player ───────────────────────────────────────────
+function openExpanded() {
+  if (!currentStation) return;
+  const s = currentStation;
+
+  document.getElementById("exp-name").textContent = s.name;
+  const countryDisplay = lang === "zh" ? (getCountryZh(s.countrycode) || s.country || "") : (s.country || "");
+  const tagDisplay = s.tags ? s.tags.split(",").slice(0, 2).map(tg => lang === "zh" ? getTagZh(tg) : tg).join(" · ") : "";
+  document.getElementById("exp-meta").textContent = [countryDisplay, tagDisplay].filter(Boolean).join("  ·  ");
+
+  const expFaviconImg = document.getElementById("exp-favicon");
+  const expFaviconPh = document.getElementById("exp-favicon-ph");
+  if (s.favicon) {
+    expFaviconImg.src = s.favicon;
+    expFaviconImg.style.display = "";
+    expFaviconPh.style.display = "none";
+  } else {
+    expFaviconImg.style.display = "none";
+    expFaviconPh.style.display = "flex";
+  }
+
+  expPlayPause.textContent = isPlaying ? "⏸" : "▶";
+  const isFav = favorites.has(s.stationuuid);
+  expFav.classList.toggle("fav-active", isFav);
+  expFav.textContent = isFav ? "♥" : "♡";
+
+  playerExpanded.classList.remove("hidden");
+  playerExpanded.classList.toggle("is-playing", isPlaying);
+
+  // sync sleep
+  expSleepSelect.value = sleepSelect.value;
+  expSleepCountdown.textContent = sleepCountdown.textContent;
+}
+
+function closeExpanded() {
+  playerExpanded.classList.add("hidden");
+}
+
+document.getElementById("player-info-click").addEventListener("click", openExpanded);
+document.getElementById("exp-close").addEventListener("click", closeExpanded);
+playerExpanded.addEventListener("click", e => { if (e.target === playerExpanded) closeExpanded(); });
+
+// Swipe down to close
+let touchStartY = 0;
+playerExpanded.addEventListener("touchstart", e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+playerExpanded.addEventListener("touchmove", e => {
+  if (e.touches[0].clientY - touchStartY > 60) closeExpanded();
+}, { passive: true });
+
+expPlayPause.addEventListener("click", () => {
+  btnPlayPause.click();
+  expPlayPause.textContent = isPlaying ? "⏸" : "▶";
+  playerExpanded.classList.toggle("is-playing", isPlaying);
+});
+
+expFav.addEventListener("click", () => {
+  btnFavPlayer.click();
+  const isFav = favorites.has(currentStation?.stationuuid);
+  expFav.classList.toggle("fav-active", isFav);
+  expFav.textContent = isFav ? "♥" : "♡";
+});
+
+expSleepSelect.addEventListener("change", () => {
+  sleepSelect.value = expSleepSelect.value;
+  sleepSelect.dispatchEvent(new Event("change"));
+});
+
+// Keep exp sleep countdown in sync
+setInterval(() => {
+  if (!playerExpanded.classList.contains("hidden")) {
+    expSleepCountdown.textContent = sleepCountdown.textContent;
+  }
+}, 1000);
+
+// Sync expanded play button when audio state changes
+audio.addEventListener("playing", () => {
+  expPlayPause.textContent = "⏸";
+  playerExpanded.classList.add("is-playing");
+});
+audio.addEventListener("pause", () => {
+  expPlayPause.textContent = "▶";
+  playerExpanded.classList.remove("is-playing");
+});
+
+// ── Auto-play from share link ─────────────────────────────────
+async function checkShareLink() {
+  const params = new URLSearchParams(location.search);
+  const uuid = params.get("play");
+  if (!uuid) return;
+  const station = await apiFetch(`/api/stations/uuid/${uuid}`);
+  if (station?.stationuuid) {
+    history.replaceState({}, "", "/");
+    playStation(station);
+    setTimeout(openExpanded, 400);
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────
 (async () => {
   applyLang();
   await Promise.all([loadFavorites(), loadFilters()]);
   lastQuery = {};
   await loadStations(true);
+  await checkShareLink();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 })();

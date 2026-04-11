@@ -195,15 +195,31 @@ header h1 {
   border-color: var(--accent);
 }
 
+.select-wrap {
+  position: relative;
+}
+
+.select-wrap::after {
+  content: "▾";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text2);
+  font-size: 12px;
+  pointer-events: none;
+}
+
 .search-bar select {
   background: var(--input-bg);
   border: 1px solid var(--card-border);
   border-radius: 10px;
   color: var(--text);
   font-size: 13px;
-  padding: 9px 10px;
+  padding: 9px 28px 9px 10px;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   transition: border-color var(--transition);
 }

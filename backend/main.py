@@ -1,38 +1,100 @@
+import asyncio
 import os
-import httpx
 import sqlite3
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
+from datetime import datetime, timedelta
+from typing import Optional
+
+import httpx
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from pathlib import Path
+from pydantic import BaseModel
 
 _data_dir = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
 DB_PATH = _data_dir / "favorites.db"
 FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
 RADIO_API = "https://de1.api.radio-browser.info/json"
+SECRET_KEY = os.environ.get("SECRET_KEY", "bolandio-dev-secret-change-in-production")
+ALGORITHM = "HS256"
+TOKEN_DAYS = 30
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer(auto_error=False)
 
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
+
+    # Users table
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS favorites (
-            stationuuid TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            url TEXT NOT NULL,
-            country TEXT,
-            tags TEXT,
-            favicon TEXT,
-            group_name TEXT DEFAULT '默认',
-            added_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # migrate existing tables
-    try:
-        conn.execute("ALTER TABLE favorites ADD COLUMN group_name TEXT DEFAULT '默认'")
-    except Exception:
-        pass
+
+    # Check if favorites table exists and needs migration
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+
+    if "favorites" in tables:
+        cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(favorites)").fetchall()
+        }
+        if "user_id" not in cols:
+            # Migrate old schema (stationuuid PRIMARY KEY) to new (user_id + stationuuid)
+            conn.execute("ALTER TABLE favorites RENAME TO favorites_legacy")
+            conn.execute("""
+                CREATE TABLE favorites (
+                    user_id INTEGER NOT NULL DEFAULT 0,
+                    stationuuid TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    country TEXT DEFAULT '',
+                    tags TEXT DEFAULT '',
+                    favicon TEXT DEFAULT '',
+                    group_name TEXT DEFAULT '默认',
+                    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, stationuuid)
+                )
+            """)
+            conn.execute("""
+                INSERT OR IGNORE INTO favorites
+                    (user_id, stationuuid, name, url, country, tags, favicon, group_name, added_at)
+                SELECT 0, stationuuid, name, url,
+                       COALESCE(country,''), COALESCE(tags,''), COALESCE(favicon,''),
+                       COALESCE(group_name,'默认'), added_at
+                FROM favorites_legacy
+            """)
+            conn.execute("DROP TABLE favorites_legacy")
+    else:
+        conn.execute("""
+            CREATE TABLE favorites (
+                user_id INTEGER NOT NULL DEFAULT 0,
+                stationuuid TEXT NOT NULL,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                country TEXT DEFAULT '',
+                tags TEXT DEFAULT '',
+                favicon TEXT DEFAULT '',
+                group_name TEXT DEFAULT '默认',
+                added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, stationuuid)
+            )
+        """)
+
     conn.commit()
     conn.close()
 
@@ -46,6 +108,38 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+
+def create_token(user_id: int, username: str) -> str:
+    expire = datetime.utcnow() + timedelta(days=TOKEN_DAYS)
+    return jwt.encode(
+        {"sub": str(user_id), "username": username, "exp": expire},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def get_current_user(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
+    if not creds:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(creds.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload["sub"])
+        username = payload["username"]
+        return {"id": user_id, "username": username}
+    except (JWTError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+
 class FavoriteStation(BaseModel):
     stationuuid: str
     name: str
@@ -55,6 +149,60 @@ class FavoriteStation(BaseModel):
     favicon: str = ""
     group_name: str = "默认"
 
+
+# ── Auth endpoints ────────────────────────────────────────────────────────────
+
+@app.post("/api/auth/register")
+def register(body: UserCreate):
+    username = body.username.strip()
+    if len(username) < 2:
+        raise HTTPException(400, "用户名至少2个字符")
+    if len(body.password) < 6:
+        raise HTTPException(400, "密码至少6位")
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            (username, pwd_context.hash(body.password)),
+        )
+        conn.commit()
+        user_id = conn.execute(
+            "SELECT id FROM users WHERE username=?", (username,)
+        ).fetchone()[0]
+    except sqlite3.IntegrityError:
+        raise HTTPException(400, "用户名已存在")
+    finally:
+        conn.close()
+    return {
+        "access_token": create_token(user_id, username),
+        "token_type": "bearer",
+        "username": username,
+    }
+
+
+@app.post("/api/auth/login")
+def login(body: UserCreate):
+    username = body.username.strip()
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute(
+        "SELECT id, username, password_hash FROM users WHERE username=?", (username,)
+    ).fetchone()
+    conn.close()
+    if not row or not pwd_context.verify(body.password, row[2]):
+        raise HTTPException(401, "用户名或密码错误")
+    return {
+        "access_token": create_token(row[0], row[1]),
+        "token_type": "bearer",
+        "username": row[1],
+    }
+
+
+@app.get("/api/auth/me")
+def get_me(user=Depends(get_current_user)):
+    return user
+
+
+# ── Radio Browser: search & discovery ────────────────────────────────────────
 
 @app.get("/api/stations/search")
 async def search_stations(
@@ -103,9 +251,10 @@ async def get_random_station():
     import random
     offset = random.randint(0, 400)
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(f"{RADIO_API}/stations/topvote", params={
-            "limit": 1, "offset": offset, "hidebroken": "true"
-        })
+        resp = await client.get(
+            f"{RADIO_API}/stations/topvote",
+            params={"limit": 1, "offset": offset, "hidebroken": "true"},
+        )
         resp.raise_for_status()
         data = resp.json()
         return data[0] if data else {}
@@ -123,36 +272,80 @@ async def get_station_by_uuid(uuid: str):
 @app.get("/api/stations/tags")
 async def get_tags():
     async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(f"{RADIO_API}/tags", params={"limit": 50, "order": "stationcount", "reverse": "true"})
+        resp = await client.get(
+            f"{RADIO_API}/tags",
+            params={"limit": 50, "order": "stationcount", "reverse": "true"},
+        )
         resp.raise_for_status()
         data = resp.json()
         return [{"name": t["name"], "count": t["stationcount"]} for t in data]
 
 
+@app.post("/api/stations/check")
+async def check_stations_status(body: dict):
+    """Batch-check whether stations are alive using Radio Browser lastcheckok field."""
+    uuids = body.get("uuids", [])[:40]
+    if not uuids:
+        return {}
+
+    async def check_one(client: httpx.AsyncClient, uuid: str):
+        try:
+            resp = await client.get(f"{RADIO_API}/stations/byuuid/{uuid}", timeout=8)
+            data = resp.json()
+            if data:
+                return uuid, data[0].get("lastcheckok", 1)
+            return uuid, 0
+        except Exception:
+            return uuid, 1  # Don't penalise on network error
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        results = await asyncio.gather(*[check_one(client, u) for u in uuids])
+        return dict(results)
+
+
+# ── Favorites (auth required) ─────────────────────────────────────────────────
+
 @app.get("/api/favorites")
-def get_favorites():
+def get_favorites(user=Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM favorites ORDER BY group_name, added_at DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM favorites WHERE user_id=? ORDER BY group_name, added_at DESC",
+        (user["id"],),
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
 @app.get("/api/favorites/groups")
-def get_groups():
+def get_groups(user=Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute("SELECT DISTINCT group_name FROM favorites ORDER BY group_name").fetchall()
+    rows = conn.execute(
+        "SELECT DISTINCT group_name FROM favorites WHERE user_id=? ORDER BY group_name",
+        (user["id"],),
+    ).fetchall()
     conn.close()
     return [r[0] for r in rows]
 
 
 @app.post("/api/favorites")
-def add_favorite(station: FavoriteStation):
+def add_favorite(station: FavoriteStation, user=Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.execute(
-            "INSERT OR REPLACE INTO favorites (stationuuid, name, url, country, tags, favicon, group_name) VALUES (?,?,?,?,?,?,?)",
-            (station.stationuuid, station.name, station.url, station.country, station.tags, station.favicon, station.group_name),
+            """INSERT OR REPLACE INTO favorites
+               (user_id, stationuuid, name, url, country, tags, favicon, group_name)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (
+                user["id"],
+                station.stationuuid,
+                station.name,
+                station.url,
+                station.country,
+                station.tags,
+                station.favicon,
+                station.group_name,
+            ),
         )
         conn.commit()
     finally:
@@ -161,23 +354,31 @@ def add_favorite(station: FavoriteStation):
 
 
 @app.patch("/api/favorites/{stationuuid}/group")
-def move_to_group(stationuuid: str, body: dict):
+def move_to_group(stationuuid: str, body: dict, user=Depends(get_current_user)):
     group_name = body.get("group_name", "默认")
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("UPDATE favorites SET group_name=? WHERE stationuuid=?", (group_name, stationuuid))
+    conn.execute(
+        "UPDATE favorites SET group_name=? WHERE stationuuid=? AND user_id=?",
+        (group_name, stationuuid, user["id"]),
+    )
     conn.commit()
     conn.close()
     return {"ok": True}
 
 
 @app.delete("/api/favorites/{stationuuid}")
-def remove_favorite(stationuuid: str):
+def remove_favorite(stationuuid: str, user=Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("DELETE FROM favorites WHERE stationuuid = ?", (stationuuid,))
+    conn.execute(
+        "DELETE FROM favorites WHERE stationuuid=? AND user_id=?",
+        (stationuuid, user["id"]),
+    )
     conn.commit()
     conn.close()
     return {"ok": True}
 
+
+# ── Static / SPA fallback ─────────────────────────────────────────────────────
 
 app.mount("/static", StaticFiles(directory=FRONTEND_PATH), name="static")
 

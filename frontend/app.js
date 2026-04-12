@@ -58,7 +58,24 @@ function getTagZh(tag) {
   return TAG_ZH[tag.toLowerCase().trim()] || tag;
 }
 
-// ── i18n ──────────────────────────────────────────────────────
+// ── 热门国家 ──────────────────────────────────────────────────
+const HOT_COUNTRIES = [
+  { code: "CN", flag: "🇨🇳" },
+  { code: "US", flag: "🇺🇸" },
+  { code: "JP", flag: "🇯🇵" },
+  { code: "GB", flag: "🇬🇧" },
+  { code: "DE", flag: "🇩🇪" },
+  { code: "FR", flag: "🇫🇷" },
+  { code: "KR", flag: "🇰🇷" },
+  { code: "RU", flag: "🇷🇺" },
+  { code: "BR", flag: "🇧🇷" },
+  { code: "IN", flag: "🇮🇳" },
+  { code: "AU", flag: "🇦🇺" },
+  { code: "CA", flag: "🇨🇦" },
+  { code: "ES", flag: "🇪🇸" },
+  { code: "IT", flag: "🇮🇹" },
+];
+
 // ── History ───────────────────────────────────────────────────
 const HISTORY_KEY = "radio_history";
 const HISTORY_MAX = 30;
@@ -70,11 +87,8 @@ function loadHistory() {
 
 function saveToHistory(station) {
   let history = loadHistory();
-  // Remove duplicate
   history = history.filter(s => s.stationuuid !== station.stationuuid);
-  // Add to front with timestamp
   history.unshift({ ...station, playedAt: Date.now() });
-  // Keep max 30
   history = history.slice(0, HISTORY_MAX);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
@@ -170,6 +184,17 @@ const STRINGS = {
     min: "分钟",
     allGroups: "全部",
     moveToGroup: "移动到分组",
+    login: "登录",
+    register: "注册",
+    logout: "退出登录",
+    notLoggedIn: "请先登录，收藏将同步到所有设备",
+    loginNow: "立即登录",
+    loginSuccess: "登录成功，欢迎回来",
+    registerSuccess: "注册成功，欢迎使用",
+    loginFailed: "用户名或密码错误",
+    registerFailed: "注册失败，请重试",
+    passwordMismatch: "两次密码不一致",
+    deadStation: "信号中断",
   },
   en: {
     title: "🌍 Bolandio",
@@ -192,6 +217,17 @@ const STRINGS = {
     min: "min",
     allGroups: "All",
     moveToGroup: "Move to Group",
+    login: "Login",
+    register: "Register",
+    logout: "Logout",
+    notLoggedIn: "Login to sync favorites across devices",
+    loginNow: "Login",
+    loginSuccess: "Welcome back!",
+    registerSuccess: "Welcome to Bolandio!",
+    loginFailed: "Wrong username or password",
+    registerFailed: "Registration failed, please try again",
+    passwordMismatch: "Passwords do not match",
+    deadStation: "Signal lost",
   },
 };
 
@@ -209,6 +245,11 @@ function applyLang() {
   document.getElementById("btn-search").textContent = t("search");
   document.getElementById("btn-load-more").textContent = t("loadMore");
   document.getElementById("btn-lang").textContent = lang === "zh" ? "EN" : "中";
+  document.getElementById("auth-tab-login").textContent = t("login");
+  document.getElementById("auth-tab-register").textContent = t("register");
+  document.getElementById("auth-login-btn").textContent = t("login");
+  document.getElementById("auth-register-btn").textContent = t("register");
+  document.getElementById("btn-logout").textContent = t("logout");
   const sleepSel = document.getElementById("exp-sleep-select");
   if (sleepSel) {
     sleepSel.options[0].textContent = t("timer");
@@ -217,6 +258,7 @@ function applyLang() {
       sleepSel.options[i].textContent = lang === "zh" ? `${mins}${t("min")}` : `${mins} min`;
     }
   }
+  renderHotCountries();
 }
 
 document.getElementById("btn-clear-history").addEventListener("click", clearHistory);
@@ -253,9 +295,151 @@ document.getElementById("btn-theme").addEventListener("click", () => {
   applyTheme(theme === "dark" ? "light" : "dark");
 });
 
+// ── Auth state ────────────────────────────────────────────────
+let authToken = localStorage.getItem("auth_token") || null;
+let authUser = null;
+
+async function checkAuth() {
+  if (!authToken) return;
+  const data = await apiFetch("/api/auth/me");
+  if (data?.id) {
+    authUser = data;
+    updateAuthUI();
+  } else {
+    authToken = null;
+    authUser = null;
+    localStorage.removeItem("auth_token");
+  }
+}
+
+async function doLogin() {
+  const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
+  if (!username || !password) return;
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => null);
+  if (res.ok && data?.access_token) {
+    authToken = data.access_token;
+    authUser = { id: null, username: data.username };
+    localStorage.setItem("auth_token", authToken);
+    // Refresh user id via /me
+    const me = await apiFetch("/api/auth/me");
+    if (me?.id) authUser = me;
+    updateAuthUI();
+    closeModal(modalAuth);
+    await loadFavorites();
+    renderFavorites();
+    showToast(`✅ ${t("loginSuccess")}，${data.username}！`);
+  } else {
+    showToast(`❌ ${data?.detail || t("loginFailed")}`);
+  }
+}
+
+async function doRegister() {
+  const username = document.getElementById("reg-username").value.trim();
+  const password = document.getElementById("reg-password").value;
+  const password2 = document.getElementById("reg-password2").value;
+  if (!username || !password) return;
+  if (password !== password2) {
+    showToast(`❌ ${t("passwordMismatch")}`);
+    return;
+  }
+  const res = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => null);
+  if (res.ok && data?.access_token) {
+    authToken = data.access_token;
+    localStorage.setItem("auth_token", authToken);
+    const me = await apiFetch("/api/auth/me");
+    if (me?.id) authUser = me;
+    updateAuthUI();
+    closeModal(modalAuth);
+    await loadFavorites();
+    renderFavorites();
+    showToast(`🎉 ${t("registerSuccess")}，${data.username}！`);
+  } else {
+    showToast(`❌ ${data?.detail || t("registerFailed")}`);
+  }
+}
+
+function doLogout() {
+  authToken = null;
+  authUser = null;
+  localStorage.removeItem("auth_token");
+  favorites.clear();
+  updateAuthUI();
+  renderFavorites();
+  closeModal(modalAuth);
+  showToast(lang === "zh" ? "已退出登录" : "Logged out");
+}
+
+function updateAuthUI() {
+  const btn = document.getElementById("btn-user");
+  const loggedOutEl = document.getElementById("auth-logged-out");
+  const loggedInEl = document.getElementById("auth-logged-in");
+  if (authUser) {
+    const initial = (authUser.username || "U")[0].toUpperCase();
+    btn.textContent = initial;
+    btn.title = authUser.username;
+    btn.classList.add("logged-in");
+    document.getElementById("user-avatar-modal").textContent = initial;
+    document.getElementById("user-profile-name").textContent = authUser.username;
+    loggedOutEl.style.display = "none";
+    loggedInEl.style.display = "";
+  } else {
+    btn.textContent = "👤";
+    btn.title = lang === "zh" ? "登录" : "Login";
+    btn.classList.remove("logged-in");
+    loggedOutEl.style.display = "";
+    loggedInEl.style.display = "none";
+  }
+}
+
+// Auth modal toggle (login ↔ register tabs)
+document.getElementById("auth-tab-login").addEventListener("click", () => {
+  document.getElementById("auth-tab-login").classList.add("active");
+  document.getElementById("auth-tab-register").classList.remove("active");
+  document.getElementById("auth-form-login").style.display = "";
+  document.getElementById("auth-form-register").style.display = "none";
+});
+document.getElementById("auth-tab-register").addEventListener("click", () => {
+  document.getElementById("auth-tab-register").classList.add("active");
+  document.getElementById("auth-tab-login").classList.remove("active");
+  document.getElementById("auth-form-register").style.display = "";
+  document.getElementById("auth-form-login").style.display = "none";
+});
+
+document.getElementById("auth-login-btn").addEventListener("click", doLogin);
+document.getElementById("auth-register-btn").addEventListener("click", doRegister);
+document.getElementById("btn-logout").addEventListener("click", doLogout);
+
+// Enter key in auth inputs
+["login-username", "login-password"].forEach(id => {
+  document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+});
+["reg-username", "reg-password", "reg-password2"].forEach(id => {
+  document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") doRegister(); });
+});
+
+// User button
+const modalAuth = document.getElementById("modal-auth");
+document.getElementById("btn-user").addEventListener("click", () => {
+  updateAuthUI();
+  openModal(modalAuth);
+});
+document.getElementById("modal-auth-close").addEventListener("click", () => closeModal(modalAuth));
+modalAuth.addEventListener("click", e => { if (e.target === modalAuth) closeModal(modalAuth); });
+
 // ── State ─────────────────────────────────────────────────────
 let currentStation = null;
-let favorites = new Map();   // uuid → station data (with group_name)
+let favorites = new Map();
 let isPlaying = false;
 let sleepTimer = null;
 let sleepEnd = null;
@@ -264,8 +448,9 @@ let currentOffset = 0;
 let lastQuery = {};
 let activeGroup = "__all__";
 let pendingFavStation = null;
-let currentPlaylist = [];       // stations visible in current list
+let currentPlaylist = [];
 let currentPlaylistIndex = -1;
+let activeHotCountry = "";
 
 // ── DOM ───────────────────────────────────────────────────────
 const audio = document.getElementById("audio-player");
@@ -303,6 +488,36 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
+// ── Hot countries bar ─────────────────────────────────────────
+function renderHotCountries() {
+  const bar = document.getElementById("hot-countries-bar");
+  bar.innerHTML = "";
+  HOT_COUNTRIES.forEach(c => {
+    const btn = document.createElement("button");
+    btn.className = "hot-country-btn" + (activeHotCountry === c.code ? " active" : "");
+    const name = lang === "zh" ? (COUNTRY_ZH[c.code] || c.code) : c.code;
+    btn.textContent = `${c.flag} ${name}`;
+    btn.dataset.code = c.code;
+    btn.addEventListener("click", () => {
+      if (activeHotCountry === c.code) {
+        // Deselect
+        activeHotCountry = "";
+        document.getElementById("filter-country").value = "";
+      } else {
+        activeHotCountry = c.code;
+        document.getElementById("filter-country").value = c.code;
+      }
+      document.getElementById("search-input").value = "";
+      document.getElementById("filter-tag").value = "";
+      renderHotCountries();
+      currentOffset = 0;
+      lastQuery = { country: activeHotCountry };
+      loadStations(true);
+    });
+    bar.appendChild(btn);
+  });
+}
+
 // ── Search ────────────────────────────────────────────────────
 document.getElementById("btn-search").addEventListener("click", doSearch);
 document.getElementById("search-input").addEventListener("keydown", e => {
@@ -310,6 +525,8 @@ document.getElementById("search-input").addEventListener("keydown", e => {
 });
 
 function doSearch() {
+  activeHotCountry = "";
+  renderHotCountries();
   currentOffset = 0;
   lastQuery = {
     name: document.getElementById("search-input").value.trim(),
@@ -353,8 +570,12 @@ async function loadStations(reset) {
 // ── Station Card ──────────────────────────────────────────────
 function renderStationCard(station, container, opts = {}) {
   const card = document.createElement("div");
-  const isPlaying = currentStation?.stationuuid === station.stationuuid;
-  card.className = "station-card" + (isPlaying ? " playing" : "");
+  const nowPlaying = currentStation?.stationuuid === station.stationuuid;
+  // lastcheckok: 0 means Radio Browser detected the stream is down
+  const isDead = station.lastcheckok === 0;
+  card.className = "station-card" +
+    (nowPlaying ? " playing" : "") +
+    (isDead ? " dead" : "");
   card.dataset.uuid = station.stationuuid;
 
   const isFav = favorites.has(station.stationuuid);
@@ -366,6 +587,10 @@ function renderStationCard(station, container, opts = {}) {
     : "";
   const meta = [countryDisplay, tags].filter(Boolean).join(" · ");
 
+  const deadBadge = isDead
+    ? `<span class="dead-badge">${t("deadStation")}</span>`
+    : "";
+
   card.innerHTML = `
     <div class="station-favicon-wrap">
       ${station.favicon
@@ -376,7 +601,7 @@ function renderStationCard(station, container, opts = {}) {
       <div class="equalizer"><span></span><span></span><span></span></div>
     </div>
     <div class="station-info">
-      <div class="station-name">${escHtml(station.name)}</div>
+      <div class="station-name">${escHtml(station.name)}${deadBadge}</div>
       <div class="station-meta">${escHtml(meta)}</div>
     </div>
     <div class="station-actions">
@@ -390,6 +615,11 @@ function renderStationCard(station, container, opts = {}) {
       removeFavorite(station.stationuuid);
       syncFavBtn(station.stationuuid, false);
     } else {
+      if (!authUser) {
+        showToast(lang === "zh" ? "请先登录后再收藏" : "Please login to add favorites");
+        openModal(modalAuth);
+        return;
+      }
       openGroupPicker(station);
     }
   });
@@ -442,7 +672,6 @@ function playStation(station) {
   isPlaying = true;
   btnPlayPause.textContent = "⏸";
 
-  // Sync expanded player if open
   if (!playerExpanded.classList.contains("hidden")) openExpanded();
 
   setupMediaSession(station);
@@ -468,6 +697,11 @@ btnFavPlayer.addEventListener("click", () => {
     removeFavorite(currentStation.stationuuid);
     syncFavBtn(currentStation.stationuuid, false);
   } else {
+    if (!authUser) {
+      showToast(lang === "zh" ? "请先登录后再收藏" : "Please login to add favorites");
+      openModal(modalAuth);
+      return;
+    }
     openGroupPicker(currentStation);
   }
 });
@@ -544,10 +778,35 @@ function updateSleepCountdown() {
 
 // ── Favorites ─────────────────────────────────────────────────
 async function loadFavorites() {
+  if (!authUser) { favorites.clear(); return; }
   const data = await apiFetch("/api/favorites");
   if (!data) return;
   favorites.clear();
   data.forEach(s => favorites.set(s.stationuuid, s));
+  // Background status check for favorites
+  checkFavoritesStatus();
+}
+
+async function checkFavoritesStatus() {
+  const uuids = [...favorites.keys()];
+  if (!uuids.length) return;
+  const result = await apiFetch("/api/stations/check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uuids }),
+  });
+  if (!result) return;
+  let changed = false;
+  for (const [uuid, ok] of Object.entries(result)) {
+    if (favorites.has(uuid)) {
+      const s = favorites.get(uuid);
+      if (s.lastcheckok !== ok) {
+        favorites.set(uuid, { ...s, lastcheckok: ok });
+        changed = true;
+      }
+    }
+  }
+  if (changed) renderFavorites();
 }
 
 async function removeFavorite(uuid) {
@@ -557,6 +816,11 @@ async function removeFavorite(uuid) {
 }
 
 async function addFavorite(station, groupName) {
+  if (!authUser) {
+    showToast(lang === "zh" ? "请先登录后再收藏" : "Please login to add favorites");
+    openModal(modalAuth);
+    return;
+  }
   const entry = { ...station, group_name: groupName, url: station.url_resolved || station.url };
   favorites.set(station.stationuuid, entry);
   await apiFetch("/api/favorites", {
@@ -611,13 +875,11 @@ document.getElementById("modal-new-group-btn").addEventListener("click", () => {
   addFavorite(pendingFavStation, name);
 });
 
-// Close modal on overlay click or X button
 modalGroupPicker.addEventListener("click", e => { if (e.target === modalGroupPicker) closeModal(modalGroupPicker); });
 modalNewGroup.addEventListener("click", e => { if (e.target === modalNewGroup) closeModal(modalNewGroup); });
 document.getElementById("modal-group-close").addEventListener("click", () => closeModal(modalGroupPicker));
 document.getElementById("modal-new-group-close").addEventListener("click", () => closeModal(modalNewGroup));
 
-// New group from favorites tab
 document.getElementById("btn-add-group").addEventListener("click", () => {
   document.getElementById("new-group-input").value = "";
   document.getElementById("new-group-input").placeholder = t("newGroupPlaceholder");
@@ -643,7 +905,6 @@ function getGroups() {
 }
 
 function renderGroupBar() {
-  // Remove all chips (keep the + button)
   groupBar.querySelectorAll(".group-chip").forEach(c => c.remove());
   const addBtn = document.getElementById("btn-add-group");
 
@@ -665,6 +926,23 @@ function renderGroupBar() {
 }
 
 function renderFavorites() {
+  // Show login prompt if not authenticated
+  if (!authUser) {
+    groupBar.querySelectorAll(".group-chip").forEach(c => c.remove());
+    favoritesList.innerHTML = `
+      <div class="login-prompt">
+        <div class="login-prompt-icon">🔐</div>
+        <div class="login-prompt-text">${t("notLoggedIn")}</div>
+        <button class="login-prompt-btn" id="btn-login-from-fav">${t("loginNow")}</button>
+      </div>
+    `;
+    document.getElementById("btn-login-from-fav")?.addEventListener("click", () => {
+      updateAuthUI();
+      openModal(modalAuth);
+    });
+    return;
+  }
+
   renderGroupBar();
   favoritesList.innerHTML = "";
   currentPlaylist = [];
@@ -679,7 +957,6 @@ function renderFavorites() {
     return;
   }
 
-  // Group by group_name if showing all
   if (activeGroup === "__all__") {
     const grouped = {};
     items.forEach(s => {
@@ -749,9 +1026,20 @@ function renderFilters() {
 }
 
 // ── Utils ──────────────────────────────────────────────────────
-async function apiFetch(url, options) {
+async function apiFetch(url, options = {}) {
   try {
-    const res = await fetch(url, options);
+    const headers = { ...(options.headers || {}) };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      // Token expired or invalid
+      authToken = null;
+      authUser = null;
+      localStorage.removeItem("auth_token");
+      updateAuthUI();
+      renderFavorites();
+      return null;
+    }
     if (!res.ok) return null;
     if (options?.method === "DELETE") return {};
     return res.json();
@@ -831,7 +1119,6 @@ function openExpanded() {
 
   playerExpanded.classList.remove("hidden");
   playerExpanded.classList.toggle("is-playing", isPlaying);
-
 }
 
 function closeExpanded() {
@@ -842,7 +1129,6 @@ document.getElementById("player-info-click").addEventListener("click", openExpan
 document.getElementById("exp-close").addEventListener("click", closeExpanded);
 playerExpanded.addEventListener("click", e => { if (e.target === playerExpanded) closeExpanded(); });
 
-// Swipe down to close
 let touchStartY = 0;
 playerExpanded.addEventListener("touchstart", e => { touchStartY = e.touches[0].clientY; }, { passive: true });
 playerExpanded.addEventListener("touchmove", e => {
@@ -862,8 +1148,6 @@ expFav.addEventListener("click", () => {
   expFav.textContent = isFav ? "♥" : "♡";
 });
 
-
-// Sync expanded play button when audio state changes
 audio.addEventListener("playing", () => {
   expPlayPause.textContent = "⏸";
   playerExpanded.classList.add("is-playing");
@@ -889,9 +1173,9 @@ async function checkShareLink() {
 // ── Init ───────────────────────────────────────────────────────
 (async () => {
   applyLang();
-  // 收藏必须等，电台列表依赖它；过滤器在后台加载，不阻塞电台显示
+  await checkAuth();
   await loadFavorites();
-  loadFilters(); // 后台加载，不 await
+  loadFilters();
   lastQuery = {};
   await loadStations(true);
   await checkShareLink();

@@ -51,6 +51,8 @@
 
 html, body {
   height: 100%;
+  /* Use dynamic viewport height for mobile browsers */
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
@@ -66,6 +68,7 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 100dvh;
 }
 
 /* ── Sidebar (mobile = top header + tab bar) ─────────────────── */
@@ -113,6 +116,14 @@ h1#app-title {
 }
 .icon-btn:active { opacity: 0.7; }
 .lang-btn { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+
+/* User button logged-in state */
+.user-btn.logged-in {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
 
 /* ── Tabs (mobile = horizontal) ──────────────────────────────── */
 .tabs {
@@ -238,6 +249,45 @@ h1#app-title {
 }
 #btn-search:active { opacity: 0.85; }
 
+/* ── Hot Countries Bar ───────────────────────────────────────── */
+.hot-countries-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+.hot-countries-bar::-webkit-scrollbar { display: none; }
+
+.hot-country-btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+.hot-country-btn:active { opacity: 0.7; }
+.hot-country-btn:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.hot-country-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ── Station list ────────────────────────────────────────────── */
 .station-list {
   padding: 14px 16px;
@@ -290,6 +340,29 @@ h1#app-title {
 .station-card.playing {
   border-color: var(--accent);
   background: var(--accent-dim);
+}
+
+/* Dead station: grayed out */
+.station-card.dead {
+  opacity: 0.45;
+  filter: grayscale(0.55);
+}
+.station-card.dead:hover {
+  background: var(--card-bg);
+  transform: none;
+}
+
+.dead-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .station-favicon-wrap {
@@ -468,6 +541,31 @@ h1#app-title {
 }
 .btn-add-group:active { opacity: 0.7; }
 
+/* ── Login prompt (favorites when not logged in) ─────────────── */
+.login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 60px 24px;
+  color: var(--text2);
+  text-align: center;
+}
+.login-prompt-icon { font-size: 40px; }
+.login-prompt-text { font-size: 14px; line-height: 1.6; max-width: 240px; }
+.login-prompt-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 28px;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.login-prompt-btn:active { opacity: 0.85; }
+
 /* ── Player ──────────────────────────────────────────────────── */
 .player {
   position: fixed;
@@ -499,7 +597,6 @@ h1#app-title {
   transition: opacity 0.3s;
 }
 .player.playing::before { opacity: 1; }
-
 
 .player-info {
   display: flex;
@@ -610,7 +707,6 @@ h1#app-title {
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   opacity: 0;
-  transition: opacity 0.3s;
   pointer-events: none;
   transition: opacity 0.2s;
 }
@@ -676,6 +772,95 @@ h1#app-title {
   cursor: pointer;
 }
 
+/* ── Auth Modal ──────────────────────────────────────────────── */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--input-bg);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all var(--transition);
+}
+.auth-tab.active {
+  background: var(--bg2);
+  color: var(--accent);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.15);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 4px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+/* Logged-in profile card */
+.user-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px 20px;
+}
+
+.user-avatar-large {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-profile-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.user-profile-sub {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 3px;
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--card-border);
+  color: var(--accent2);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.logout-btn:hover { background: var(--card-hover); }
+
 /* ══════════════════════════════════════════════════════════════
    DESKTOP LAYOUT (≥ 768px)
 ══════════════════════════════════════════════════════════════ */
@@ -684,6 +869,7 @@ h1#app-title {
   #app {
     flex-direction: row;
     height: 100vh;
+    height: 100dvh;
     max-width: 1280px;
     margin: 0 auto;
   }
@@ -692,6 +878,7 @@ h1#app-title {
   .app-sidebar {
     width: var(--sidebar-w);
     height: 100vh;
+    height: 100dvh;
     position: sticky;
     top: 0;
     flex-shrink: 0;
@@ -745,7 +932,7 @@ h1#app-title {
 
   /* Search bar: single row on desktop */
   .search-bar {
-    grid-template-columns: 1fr 160px 160px auto;
+    grid-template-columns: 1fr 160px 160px auto auto;
     gap: 10px;
     padding: 16px 24px;
     position: sticky;
@@ -759,6 +946,11 @@ h1#app-title {
     grid-column: auto;
     padding: 10px 20px;
     white-space: nowrap;
+  }
+
+  /* Hot countries bar */
+  .hot-countries-bar {
+    padding: 8px 24px;
   }
 
   /* Station list: 2-column grid on desktop */
@@ -785,7 +977,6 @@ h1#app-title {
     padding-right: 24px;
   }
 
-  /* Player: larger on desktop */
   .player-name { font-size: 15px; }
   .player-meta { font-size: 12px; }
 
@@ -801,12 +992,10 @@ h1#app-title {
     font-size: 18px;
   }
 
-  /* Group bar */
   .group-bar {
     padding: 12px 24px;
   }
 
-  /* History header */
   .history-header {
     padding: 14px 24px 4px;
   }
@@ -828,8 +1017,9 @@ h1#app-title {
     transform: scale(1);
   }
 
-  /* Load more */
   .load-more-wrap { grid-column: 1 / -1; padding: 8px 0 20px; }
+
+  .login-prompt { grid-column: 1 / -1; }
 }
 
 /* ── Extra wide screens ──────────────────────────────────────── */
@@ -929,6 +1119,7 @@ h1#app-title {
   padding: 20px 28px calc(32px + env(safe-area-inset-bottom));
   gap: 20px;
   max-height: 100vh;
+  max-height: 100dvh;
   overflow-y: auto;
 }
 
@@ -1095,7 +1286,6 @@ h1#app-title {
   border-radius: 20px;
   box-shadow: var(--shadow);
   opacity: 0;
-  transition: opacity 0.3s;
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
   white-space: nowrap;

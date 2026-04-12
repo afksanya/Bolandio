@@ -1273,6 +1273,57 @@ h1#app-title {
   text-align: center;
 }
 
+/* ── Volume slider ───────────────────────────────────────────── */
+.exp-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.vol-icon {
+  font-size: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition: transform 0.15s;
+}
+.vol-icon:active { transform: scale(0.85); }
+
+.volume-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--card-border);
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(168,85,247,0.45);
+  transition: transform 0.15s;
+}
+.volume-slider::-webkit-slider-thumb:active { transform: scale(1.2); }
+
+.volume-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 8px rgba(168,85,247,0.45);
+}
+
 /* ── Toast ───────────────────────────────────────────────────── */
 .toast {
   position: fixed;

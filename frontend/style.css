@@ -970,9 +970,9 @@ h1#app-title {
     grid-column: 1 / -1;
   }
 
-  /* Player: offset by sidebar width */
+  /* Player: full width across bottom */
   .player {
-    left: var(--sidebar-w);
+    left: 0;
     padding-left: 24px;
     padding-right: 24px;
   }
@@ -1349,7 +1349,7 @@ h1#app-title {
   #btn-random-mini { display: none; }
 
   .player {
-    left: var(--sidebar-w);
+    left: 0;
     padding-left: 28px;
     padding-right: 28px;
     gap: 20px;

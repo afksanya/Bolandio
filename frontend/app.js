@@ -1171,53 +1171,52 @@ async function checkShareLink() {
 }
 
 // ── Volume ────────────────────────────────────────────────────
-const volumeSlider = document.getElementById("exp-volume-slider");
-const volIcon = document.getElementById("vol-icon");
+const volumeSlider    = document.getElementById("exp-volume-slider");
+const volIcon         = document.getElementById("vol-icon");
+const volSliderMini   = document.getElementById("player-volume-slider");
+const volIconMini     = document.getElementById("vol-icon-mini");
 
-function updateVolIcon(vol) {
-  if (vol === 0) volIcon.textContent = "🔇";
-  else if (vol < 0.4) volIcon.textContent = "🔈";
-  else if (vol < 0.7) volIcon.textContent = "🔉";
-  else volIcon.textContent = "🔊";
+function volEmoji(vol) {
+  if (vol === 0) return "🔇";
+  if (vol < 0.4) return "🔈";
+  if (vol < 0.7) return "🔉";
+  return "🔊";
 }
 
-function updateSliderFill(val) {
-  const pct = val;
-  volumeSlider.style.background =
-    `linear-gradient(to right, var(--accent) ${pct}%, var(--card-border) ${pct}%)`;
-}
-
-volumeSlider.addEventListener("input", () => {
-  const vol = volumeSlider.value / 100;
+function setVolume(val, source) {
+  const vol = val / 100;
   audio.volume = vol;
-  updateVolIcon(vol);
-  updateSliderFill(volumeSlider.value);
-  localStorage.setItem("volume", volumeSlider.value);
-});
+  const emoji = volEmoji(vol);
+  volIcon.textContent = emoji;
+  volIconMini.textContent = emoji;
+  // Sync both sliders
+  if (source !== "exp")  volumeSlider.value  = val;
+  if (source !== "mini") volSliderMini.value = val;
+  // Fill track
+  const fill = `linear-gradient(to right, var(--accent) ${val}%, var(--card-border) ${val}%)`;
+  volumeSlider.style.background  = fill;
+  volSliderMini.style.background = fill;
+  localStorage.setItem("volume", val);
+}
 
-volIcon.addEventListener("click", () => {
+volumeSlider.addEventListener("input",  () => setVolume(volumeSlider.value,  "exp"));
+volSliderMini.addEventListener("input", () => setVolume(volSliderMini.value, "mini"));
+
+function toggleMute(slider) {
   if (audio.volume > 0) {
-    volIcon.dataset.prev = volumeSlider.value;
-    audio.volume = 0;
-    volumeSlider.value = 0;
-    updateVolIcon(0);
-    updateSliderFill(0);
+    slider.dataset.prev = audio.volume * 100;
+    setVolume(0);
   } else {
-    const prev = parseInt(volIcon.dataset.prev || "100");
-    audio.volume = prev / 100;
-    volumeSlider.value = prev;
-    updateVolIcon(prev / 100);
-    updateSliderFill(prev);
+    setVolume(parseInt(slider.dataset.prev || "100"));
   }
-});
+}
+volIcon.addEventListener("click",     () => toggleMute(volumeSlider));
+volIconMini.addEventListener("click", () => toggleMute(volSliderMini));
 
 // Restore saved volume
 (function initVolume() {
   const saved = parseInt(localStorage.getItem("volume") ?? "100");
-  volumeSlider.value = saved;
-  audio.volume = saved / 100;
-  updateVolIcon(saved / 100);
-  updateSliderFill(saved);
+  setVolume(saved);
 })();
 
 // ── Init ───────────────────────────────────────────────────────

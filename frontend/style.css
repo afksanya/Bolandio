@@ -1273,6 +1273,37 @@ h1#app-title {
   text-align: center;
 }
 
+/* ── Mini player volume (desktop only) ───────────────────────── */
+.player-volume-mini {
+  display: none; /* hidden on mobile */
+}
+
+@media (min-width: 768px) {
+  .player-volume-mini {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 150px;
+    flex-shrink: 0;
+  }
+  .vol-icon-mini {
+    font-size: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    user-select: none;
+    transition: transform 0.15s;
+  }
+  .vol-icon-mini:active { transform: scale(0.85); }
+  .vol-slider-mini {
+    flex: 1;
+    height: 3px;
+  }
+  .vol-slider-mini::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+  }
+}
+
 /* ── Volume slider ───────────────────────────────────────────── */
 .exp-volume {
   display: flex;

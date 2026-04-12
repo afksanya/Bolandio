@@ -1,5 +1,8 @@
 import asyncio
+import hashlib
+import hmac
 import os
+import secrets
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
@@ -11,7 +14,6 @@ from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pathlib import Path
 from pydantic import BaseModel
 
@@ -23,8 +25,22 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "bolandio-dev-secret-change-in-product
 ALGORITHM = "HS256"
 TOKEN_DAYS = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer(auto_error=False)
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(32)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 200_000)
+    return f"{salt}:{key.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, key_hex = stored.split(":", 1)
+        key = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 200_000)
+        return hmac.compare_digest(key.hex(), key_hex)
+    except Exception:
+        return False
 
 
 def init_db():
@@ -163,7 +179,7 @@ def register(body: UserCreate):
     try:
         conn.execute(
             "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, pwd_context.hash(body.password)),
+            (username, hash_password(body.password)),
         )
         conn.commit()
         user_id = conn.execute(
@@ -188,7 +204,7 @@ def login(body: UserCreate):
         "SELECT id, username, password_hash FROM users WHERE username=?", (username,)
     ).fetchone()
     conn.close()
-    if not row or not pwd_context.verify(body.password, row[2]):
+    if not row or not verify_password(body.password, row[2]):
         raise HTTPException(401, "用户名或密码错误")
     return {
         "access_token": create_token(row[0], row[1]),

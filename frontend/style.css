@@ -8,7 +8,7 @@
 /* ── Theme Variables ─────────────────────────────────────────── */
 :root {
   --radius: 14px;
-  --player-h: 80px;
+  --player-h: 64px;
   --sidebar-w: 220px;
   --transition: 0.25s ease;
 }
@@ -235,7 +235,6 @@ h1#app-title {
 .search-bar select:focus { border-color: var(--accent); }
 
 #btn-search {
-  grid-column: 1 / -1;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   border: none;
   border-radius: 10px;
@@ -610,20 +609,20 @@ h1#app-title {
 }
 
 #player-favicon {
-  width: 42px; height: 42px;
-  border-radius: 10px;
+  width: 38px; height: 38px;
+  border-radius: 9px;
   object-fit: cover;
   flex-shrink: 0;
 }
 
 .player-favicon-placeholder {
-  width: 42px; height: 42px;
-  border-radius: 10px;
+  width: 38px; height: 38px;
+  border-radius: 9px;
   background: linear-gradient(135deg, var(--accent-dim), var(--bg3));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   flex-shrink: 0;
 }
 
@@ -651,12 +650,12 @@ h1#app-title {
 }
 
 .btn-play {
-  width: 42px; height: 42px;
+  width: 38px; height: 38px;
   border-radius: 50%;
   border: none;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   color: #fff;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1047,6 +1046,7 @@ h1#app-title {
   cursor: pointer;
   transition: background var(--transition);
   grid-column: auto;
+  width: 100%;
 }
 #btn-random:active { opacity: 0.7; }
 

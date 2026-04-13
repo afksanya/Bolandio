@@ -58,6 +58,20 @@ function getTagZh(tag) {
   return TAG_ZH[tag.toLowerCase().trim()] || tag;
 }
 
+// ── 磨耳朵语言学习 ────────────────────────────────────────────
+const LEARN_LANGS = [
+  { flag: "🇺🇸", labelZh: "英语(美)", labelEn: "English(US)", country: "US", tag: "talk" },
+  { flag: "🇬🇧", labelZh: "英语(英)", labelEn: "English(UK)", country: "GB", tag: "talk" },
+  { flag: "🇯🇵", labelZh: "日语",     labelEn: "Japanese",    country: "JP", tag: "talk" },
+  { flag: "🇰🇷", labelZh: "韩语",     labelEn: "Korean",      country: "KR", tag: "talk" },
+  { flag: "🇫🇷", labelZh: "法语",     labelEn: "French",      country: "FR", tag: "talk" },
+  { flag: "🇩🇪", labelZh: "德语",     labelEn: "German",      country: "DE", tag: "talk" },
+  { flag: "🇪🇸", labelZh: "西语",     labelEn: "Spanish",     country: "ES", tag: "talk" },
+  { flag: "🇧🇷", labelZh: "葡语",     labelEn: "Portuguese",  country: "BR", tag: "talk" },
+  { flag: "🇮🇹", labelZh: "意语",     labelEn: "Italian",     country: "IT", tag: "talk" },
+  { flag: "🇷🇺", labelZh: "俄语",     labelEn: "Russian",     country: "RU", tag: "talk" },
+];
+
 // ── 热门国家 ──────────────────────────────────────────────────
 const HOT_COUNTRIES = [
   { code: "CN", flag: "🇨🇳" },
@@ -75,6 +89,118 @@ const HOT_COUNTRIES = [
   { code: "ES", flag: "🇪🇸" },
   { code: "IT", flag: "🇮🇹" },
 ];
+
+// ── Listening Stats ───────────────────────────────────────────
+const STATS_KEY = "listen_stats";
+
+function getStatsData() {
+  try { return JSON.parse(localStorage.getItem(STATS_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function getTodayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function formatDuration(seconds) {
+  if (seconds < 60) return lang === "zh" ? `${seconds} 秒` : `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (h === 0) return lang === "zh" ? `${m} 分钟` : `${m} min`;
+  return lang === "zh" ? `${h} 小时 ${rm} 分钟` : `${h}h ${rm}m`;
+}
+
+let listenStart = null;
+let listenTrackedStation = null;
+let statsFlushTimer = null;
+
+function startListenTracking(station) {
+  flushListenStats();
+  listenStart = Date.now();
+  listenTrackedStation = station;
+  clearInterval(statsFlushTimer);
+  statsFlushTimer = setInterval(flushListenStats, 10000);
+}
+
+function flushListenStats() {
+  if (!listenStart || !listenTrackedStation) return;
+  const elapsed = Math.floor((Date.now() - listenStart) / 1000);
+  if (elapsed < 2) return;
+  const today = getTodayKey();
+  const data = getStatsData();
+  if (!data[today]) data[today] = {};
+  const uuid = listenTrackedStation.stationuuid;
+  if (!data[today][uuid]) {
+    data[today][uuid] = { name: listenTrackedStation.name, favicon: listenTrackedStation.favicon || "", time: 0 };
+  }
+  data[today][uuid].time += elapsed;
+  localStorage.setItem(STATS_KEY, JSON.stringify(data));
+  listenStart = Date.now();
+}
+
+function stopListenTracking() {
+  flushListenStats();
+  clearInterval(statsFlushTimer);
+  listenStart = null;
+  listenTrackedStation = null;
+}
+
+function renderStats() {
+  const data = getStatsData();
+  const today = getTodayKey();
+  const todayData = data[today] || {};
+
+  const totalSec = Object.values(todayData).reduce((s, x) => s + x.time, 0);
+  document.getElementById("stats-total-time").textContent = totalSec > 0 ? formatDuration(totalSec) : (lang === "zh" ? "暂无记录" : "No data");
+
+  const list = document.getElementById("stats-station-list");
+  list.innerHTML = "";
+  const stations = Object.values(todayData).sort((a, b) => b.time - a.time);
+  if (stations.length === 0) {
+    list.innerHTML = `<div class="empty" style="padding:20px 0">${lang === "zh" ? "今天还没有收听记录 🎧" : "No listens today 🎧"}</div>`;
+  } else {
+    const maxTime = stations[0].time;
+    stations.forEach(s => {
+      const pct = Math.round(s.time / maxTime * 100);
+      const row = document.createElement("div");
+      row.className = "stats-station-row";
+      row.innerHTML = `
+        <div class="stats-station-name">${escHtml(s.name)}</div>
+        <div class="stats-bar-row">
+          <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%"></div></div>
+          <span class="stats-station-time">${formatDuration(s.time)}</span>
+        </div>`;
+      list.appendChild(row);
+    });
+  }
+
+  // Last 7 days bar chart
+  const daysEl = document.getElementById("stats-week-days");
+  daysEl.innerHTML = "";
+  const dayItems = [];
+  let maxDaySec = 1;
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const secs = Object.values(data[key] || {}).reduce((s, x) => s + x.time, 0);
+    if (secs > maxDaySec) maxDaySec = secs;
+    const label = i === 0 ? (lang === "zh" ? "今" : "Now") : `${d.getMonth()+1}/${d.getDate()}`;
+    dayItems.push({ secs, label, isToday: i === 0 });
+  }
+  dayItems.forEach(({ secs, label, isToday }) => {
+    const heightPct = secs > 0 ? Math.max(6, Math.round(secs / maxDaySec * 56)) : 0;
+    const col = document.createElement("div");
+    col.className = "stats-day-col";
+    col.innerHTML = `
+      <div class="stats-day-bar-wrap">
+        <div class="stats-day-bar${isToday ? " today" : ""}" style="height:${heightPct}px" title="${formatDuration(secs)}"></div>
+      </div>
+      <div class="stats-day-label${isToday ? " today" : ""}">${label}</div>`;
+    daysEl.appendChild(col);
+  });
+}
 
 // ── History ───────────────────────────────────────────────────
 const HISTORY_KEY = "radio_history";
@@ -259,6 +385,7 @@ function applyLang() {
     }
   }
   renderHotCountries();
+  renderLangLearnBar();
 }
 
 document.getElementById("btn-clear-history").addEventListener("click", clearHistory);
@@ -451,6 +578,7 @@ let pendingFavStation = null;
 let currentPlaylist = [];
 let currentPlaylistIndex = -1;
 let activeHotCountry = "";
+let activeLearnLang = "";
 
 // ── DOM ───────────────────────────────────────────────────────
 const audio = document.getElementById("audio-player");
@@ -500,16 +628,17 @@ function renderHotCountries() {
     btn.dataset.code = c.code;
     btn.addEventListener("click", () => {
       if (activeHotCountry === c.code) {
-        // Deselect
         activeHotCountry = "";
         document.getElementById("filter-country").value = "";
       } else {
         activeHotCountry = c.code;
+        activeLearnLang = "";
         document.getElementById("filter-country").value = c.code;
       }
       document.getElementById("search-input").value = "";
       document.getElementById("filter-tag").value = "";
       renderHotCountries();
+      renderLangLearnBar();
       currentOffset = 0;
       lastQuery = { country: activeHotCountry };
       loadStations(true);
@@ -517,6 +646,52 @@ function renderHotCountries() {
     bar.appendChild(btn);
   });
 }
+
+// ── Language Learning Bar ─────────────────────────────────────
+function renderLangLearnBar() {
+  const bar = document.getElementById("lang-learn-bar");
+  bar.innerHTML = "";
+  const label = document.createElement("span");
+  label.className = "lang-learn-label";
+  label.textContent = "🎧";
+  bar.appendChild(label);
+  LEARN_LANGS.forEach(lc => {
+    const btn = document.createElement("button");
+    const name = lang === "zh" ? lc.labelZh : lc.labelEn;
+    btn.className = "hot-country-btn" + (activeLearnLang === lc.country + lc.tag ? " active" : "");
+    btn.textContent = `${lc.flag} ${name}`;
+    btn.addEventListener("click", () => {
+      const id = lc.country + lc.tag;
+      if (activeLearnLang === id) {
+        activeLearnLang = "";
+        document.getElementById("filter-country").value = "";
+        document.getElementById("filter-tag").value = "";
+        lastQuery = {};
+      } else {
+        activeLearnLang = id;
+        activeHotCountry = "";
+        document.getElementById("filter-country").value = lc.country;
+        document.getElementById("filter-tag").value = lc.tag;
+        document.getElementById("search-input").value = "";
+        lastQuery = { country: lc.country, tag: lc.tag };
+        renderHotCountries();
+      }
+      renderLangLearnBar();
+      currentOffset = 0;
+      loadStations(true);
+    });
+    bar.appendChild(btn);
+  });
+}
+
+// ── Stats Modal ───────────────────────────────────────────────
+const modalStats = document.getElementById("modal-stats");
+document.getElementById("btn-stats").addEventListener("click", () => {
+  renderStats();
+  openModal(modalStats);
+});
+document.getElementById("modal-stats-close").addEventListener("click", () => closeModal(modalStats));
+modalStats.addEventListener("click", e => { if (e.target === modalStats) closeModal(modalStats); });
 
 // ── Search ────────────────────────────────────────────────────
 document.getElementById("btn-search").addEventListener("click", doSearch);
@@ -526,7 +701,9 @@ document.getElementById("search-input").addEventListener("keydown", e => {
 
 function doSearch() {
   activeHotCountry = "";
+  activeLearnLang = "";
   renderHotCountries();
+  renderLangLearnBar();
   currentOffset = 0;
   lastQuery = {
     name: document.getElementById("search-input").value.trim(),
@@ -707,10 +884,15 @@ btnFavPlayer.addEventListener("click", () => {
 });
 
 audio.addEventListener("waiting", () => player.classList.add("buffering"));
-audio.addEventListener("playing", () => player.classList.remove("buffering"));
+audio.addEventListener("playing", () => {
+  player.classList.remove("buffering");
+  if (currentStation) startListenTracking(currentStation);
+});
+audio.addEventListener("pause", () => stopListenTracking());
 audio.addEventListener("error", () => {
   player.classList.remove("buffering");
   playerMeta.textContent = t("connFailed");
+  stopListenTracking();
 });
 
 // ── Media Session ─────────────────────────────────────────────
@@ -1222,6 +1404,7 @@ volIconMini.addEventListener("click", () => toggleMute(volSliderMini));
 // ── Init ───────────────────────────────────────────────────────
 (async () => {
   applyLang();
+  renderLangLearnBar();
   await checkAuth();
   await loadFavorites();
   loadFilters();

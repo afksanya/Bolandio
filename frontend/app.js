@@ -389,6 +389,8 @@ function applyLang() {
   }
   renderHotCountries();
   renderLangLearnBar();
+  const lbl = document.getElementById("check-live-label");
+  if (lbl && !isChecking) lbl.textContent = lang === "zh" ? "检查可用性" : "Check live";
 }
 
 document.getElementById("btn-clear-history").addEventListener("click", clearHistory);
@@ -721,6 +723,80 @@ document.getElementById("btn-load-more").addEventListener("click", () => {
   loadStations(false);
 });
 
+// ── Check live status ─────────────────────────────────────────
+let isChecking = false;
+
+document.getElementById("btn-check-live").addEventListener("click", checkLiveStatus);
+
+async function checkLiveStatus() {
+  if (isChecking || !currentPlaylist.length) return;
+  isChecking = true;
+
+  const btn      = document.getElementById("btn-check-live");
+  const iconEl   = document.getElementById("check-live-icon");
+  const labelEl  = document.getElementById("check-live-label");
+  const statusEl = document.getElementById("check-live-status");
+
+  btn.disabled = true;
+  iconEl.textContent = "⏳";
+
+  const stations = currentPlaylist.map(s => ({
+    uuid: s.stationuuid,
+    url:  s.url_resolved || s.url,
+  }));
+  const total = stations.length;
+  const BATCH = 10;
+  let checked = 0;
+  let deadCount = 0;
+
+  for (let i = 0; i < stations.length; i += BATCH) {
+    const batch = stations.slice(i, i + BATCH);
+    labelEl.textContent = lang === "zh"
+      ? `检查中 ${checked}/${total}`
+      : `Checking ${checked}/${total}`;
+
+    const result = await apiFetch("/api/stations/check-live", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stations: batch }),
+    });
+
+    if (result) {
+      for (const [uuid, ok] of Object.entries(result)) {
+        const card = stationList.querySelector(`.station-card[data-uuid="${uuid}"]`);
+        if (card) card.classList.toggle("dead", ok === 0);
+        // Update currentPlaylist entry so sort reflects new status
+        const s = currentPlaylist.find(x => x.stationuuid === uuid);
+        if (s) s.lastcheckok = ok;
+        if (ok === 0) deadCount++;
+      }
+    }
+    checked += batch.length;
+  }
+
+  // Move dead cards to the end of the list
+  stationList.querySelectorAll(".station-card.dead").forEach(c => stationList.appendChild(c));
+
+  // Done
+  iconEl.textContent = "🔍";
+  labelEl.textContent = lang === "zh" ? "检查可用性" : "Check live";
+  if (deadCount > 0) {
+    statusEl.textContent = lang === "zh"
+      ? `发现 ${deadCount} 个断连，已移至末尾`
+      : `${deadCount} dead, moved to bottom`;
+    statusEl.className = "check-live-status dead";
+  } else {
+    statusEl.textContent = lang === "zh"
+      ? `✅ 全部 ${checked} 个电台可用`
+      : `✅ All ${checked} stations alive`;
+    statusEl.className = "check-live-status ok";
+  }
+  setTimeout(() => { statusEl.textContent = ""; statusEl.className = "check-live-status"; }, 5000);
+
+  btn.disabled = false;
+  isChecking = false;
+}
+
 function showSkeleton(container, count = 6) {
   container.innerHTML = Array.from({ length: count }, () => `
     <div class="skeleton-card">
@@ -748,6 +824,15 @@ async function loadStations(reset) {
   const dead  = data.filter(s => s.lastcheckok === 0);
   [...alive, ...dead].forEach(s => { currentPlaylist.push(s); renderStationCard(s, stationList); });
   loadMoreWrap.style.display = data.length === 30 ? "block" : "none";
+  // Show check toolbar once we have stations
+  const toolbar = document.getElementById("station-toolbar");
+  if (toolbar) toolbar.style.display = currentPlaylist.length > 0 ? "" : "none";
+  // Reset check status label on new search
+  if (reset) {
+    document.getElementById("check-live-status").textContent = "";
+    document.getElementById("check-live-label").textContent = lang === "zh" ? "检查可用性" : "Check live";
+    document.getElementById("check-live-icon").textContent = "🔍";
+  }
 }
 
 // ── Station Card ──────────────────────────────────────────────

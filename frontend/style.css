@@ -431,6 +431,59 @@ h1#app-title {
   font-weight: 700;
 }
 
+/* ── Station toolbar (check live button) ────────────────────── */
+.station-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+.check-live-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.check-live-btn:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.check-live-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.check-live-btn:disabled:hover {
+  background: var(--input-bg);
+  border-color: var(--card-border);
+  color: var(--text2);
+}
+
+.check-live-status {
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.check-live-status.dead { color: #ff6b6b; }
+.check-live-status.ok   { color: #4ade80; }
+
 /* ── Station list ────────────────────────────────────────────── */
 .station-list {
   padding: 14px 16px;
@@ -1102,6 +1155,11 @@ h1#app-title {
   /* Language learning bar */
   .lang-learn-bar {
     padding: 6px 24px;
+  }
+
+  /* Station toolbar */
+  .station-toolbar {
+    padding: 7px 24px;
   }
 
   /* Station list: 2-column grid on desktop */

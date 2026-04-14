@@ -300,7 +300,7 @@ async def get_tags():
 
 @app.post("/api/stations/check")
 async def check_stations_status(body: dict):
-    """Batch-check whether stations are alive using Radio Browser lastcheckok field."""
+    """Batch-check via Radio Browser lastcheckok (used for favorites)."""
     uuids = body.get("uuids", [])[:40]
     if not uuids:
         return {}
@@ -313,10 +313,56 @@ async def check_stations_status(body: dict):
                 return uuid, data[0].get("lastcheckok", 1)
             return uuid, 0
         except Exception:
-            return uuid, 1  # Don't penalise on network error
+            return uuid, 1
 
     async with httpx.AsyncClient(timeout=15) as client:
         results = await asyncio.gather(*[check_one(client, u) for u in uuids])
+        return dict(results)
+
+
+@app.post("/api/stations/check-live")
+async def check_stations_live(body: dict):
+    """Real-time probe: actually try to open each stream URL."""
+    stations = body.get("stations", [])[:15]   # max 15 concurrent
+    if not stations:
+        return {}
+
+    _headers = {"User-Agent": "Mozilla/5.0 (compatible; Bolandio/1.0)"}
+
+    async def probe(client: httpx.AsyncClient, uuid: str, url: str):
+        # 1. Try HEAD (cheap, no body)
+        try:
+            r = await client.head(
+                url, timeout=5, follow_redirects=True, headers=_headers
+            )
+            return uuid, 1 if r.status_code < 400 else 0
+        except httpx.RemoteProtocolError:
+            # ICY/SHOUTcast streams respond with "ICY 200 OK" which is
+            # not standard HTTP – connection succeeded, treat as alive.
+            return uuid, 1
+        except (httpx.ConnectError, httpx.TimeoutException):
+            return uuid, 0
+        except Exception:
+            pass  # HEAD not supported; fall through to streaming GET
+
+        # 2. Fall back to streaming GET (read only headers, close immediately)
+        try:
+            async with client.stream(
+                "GET", url,
+                timeout=httpx.Timeout(connect=5, read=2, write=5, pool=5),
+                follow_redirects=True,
+                headers=_headers,
+            ) as r:
+                return uuid, 1 if r.status_code < 400 else 0
+        except httpx.RemoteProtocolError:
+            return uuid, 1   # ICY again → alive
+        except Exception:
+            return uuid, 0
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        results = await asyncio.gather(
+            *[probe(client, s["uuid"], s["url"]) for s in stations]
+        )
         return dict(results)
 
 

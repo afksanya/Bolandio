@@ -60,16 +60,19 @@ function getTagZh(tag) {
 
 // ── 磨耳朵语言学习 ────────────────────────────────────────────
 const LEARN_LANGS = [
-  { flag: "🇺🇸", labelZh: "英语(美)", labelEn: "English(US)", country: "US", tag: "talk" },
-  { flag: "🇬🇧", labelZh: "英语(英)", labelEn: "English(UK)", country: "GB", tag: "talk" },
-  { flag: "🇯🇵", labelZh: "日语",     labelEn: "Japanese",    country: "JP", tag: "talk" },
-  { flag: "🇰🇷", labelZh: "韩语",     labelEn: "Korean",      country: "KR", tag: "talk" },
-  { flag: "🇫🇷", labelZh: "法语",     labelEn: "French",      country: "FR", tag: "talk" },
-  { flag: "🇩🇪", labelZh: "德语",     labelEn: "German",      country: "DE", tag: "talk" },
-  { flag: "🇪🇸", labelZh: "西语",     labelEn: "Spanish",     country: "ES", tag: "talk" },
-  { flag: "🇧🇷", labelZh: "葡语",     labelEn: "Portuguese",  country: "BR", tag: "talk" },
-  { flag: "🇮🇹", labelZh: "意语",     labelEn: "Italian",     country: "IT", tag: "talk" },
-  { flag: "🇷🇺", labelZh: "俄语",     labelEn: "Russian",     country: "RU", tag: "talk" },
+  // English: "news" tag gives clean spoken-word stations on Radio Browser
+  { flag: "🇺🇸", labelZh: "英语(美)", labelEn: "English(US)", country: "US", tag: "news" },
+  { flag: "🇬🇧", labelZh: "英语(英)", labelEn: "English(UK)", country: "GB", tag: "news" },
+  // For other languages, Radio Browser stations rarely use "talk"/"news" tags in English,
+  // so filter by country only to maximise results.
+  { flag: "🇯🇵", labelZh: "日语",     labelEn: "Japanese",    country: "JP", tag: "" },
+  { flag: "🇰🇷", labelZh: "韩语",     labelEn: "Korean",      country: "KR", tag: "" },
+  { flag: "🇫🇷", labelZh: "法语",     labelEn: "French",      country: "FR", tag: "" },
+  { flag: "🇩🇪", labelZh: "德语",     labelEn: "German",      country: "DE", tag: "" },
+  { flag: "🇪🇸", labelZh: "西语",     labelEn: "Spanish",     country: "ES", tag: "" },
+  { flag: "🇧🇷", labelZh: "葡语",     labelEn: "Portuguese",  country: "BR", tag: "" },
+  { flag: "🇮🇹", labelZh: "意语",     labelEn: "Italian",     country: "IT", tag: "" },
+  { flag: "🇷🇺", labelZh: "俄语",     labelEn: "Russian",     country: "RU", tag: "" },
 ];
 
 // ── 热门国家 ──────────────────────────────────────────────────
@@ -740,7 +743,10 @@ async function loadStations(reset) {
   const data = await apiFetch(`/api/stations/search?${params}`);
   if (!data) return;
   if (reset) stationList.innerHTML = "";
-  data.forEach(s => { currentPlaylist.push(s); renderStationCard(s, stationList); });
+  // Sort each batch: alive stations first (lastcheckok !== 0), dead last
+  const alive = data.filter(s => s.lastcheckok !== 0);
+  const dead  = data.filter(s => s.lastcheckok === 0);
+  [...alive, ...dead].forEach(s => { currentPlaylist.push(s); renderStationCard(s, stationList); });
   loadMoreWrap.style.display = data.length === 30 ? "block" : "none";
 }
 

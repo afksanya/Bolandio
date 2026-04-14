@@ -233,7 +233,8 @@ async def search_stations(
         "offset": offset,
         "order": "votes",
         "reverse": "true",
-        "hidebroken": "true",
+        # Let the frontend handle dead-station grayout + sorting;
+        # hiding them here prevents the UI from ever showing the dead badge.
     }
     if name:
         params["name"] = name
